@@ -351,14 +351,18 @@ footer{border-top:1px solid var(--line-gold);padding:32px 0;color:var(--muted);f
 <button id="toTop" aria-label="Наверх">↑</button>
 
 <script>
-/* ===== Telegram Mini App ===== */
-const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
-const inTelegram = !!(tg && tg.initData);
-if (tg) {
-  tg.ready();
-  tg.expand(); // разворачивает приложение на весь экран
-  tg.setHeaderColor('#0B0B0F'); // цвет шапки Telegram = цвет тёмного фона
-}
+/* ===== Telegram Mini App (любая ошибка здесь не должна ломать сайт) ===== */
+let tg = null, inTelegram = false;
+try {
+  tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  inTelegram = !!(tg && tg.initData);
+  if (tg) {
+    try { tg.ready(); } catch(e) {}
+    try { tg.expand(); } catch(e) {}                 // на весь экран
+    try { tg.setHeaderColor('#0B0B0F'); } catch(e) {} // шапка Telegram в цвет сайта
+    try { tg.setBackgroundColor('#0B0B0F'); } catch(e) {}
+  }
+} catch(e) { tg = null; inTelegram = false; }
 /* Год в футере */
 document.getElementById('year').textContent = new Date().getFullYear();
 
@@ -449,17 +453,29 @@ opts.forEach(o => o.addEventListener('click', () => {
 }));
 
 writeBtn.addEventListener('click', e => {
-  if (!inTelegram || !selected) return; // в обычном браузере работает ссылка на чат
+  if (!inTelegram || !selected) return; // в обычном браузере работает обычная ссылка
   e.preventDefault();
-  const u = (tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
-  const data = {
-    service: selected.service,
-    price: selected.price,
-    name: [u.first_name, u.last_name].filter(Boolean).join(' '),
-    telegram: u.username ? '@' + u.username : '',
-    message: 'Привет, нужна консультация'
-  };
-  tg.sendData(JSON.stringify(data)); // отправляет данные боту и закрывает Mini App
+  const text = 'Привет, нужна консультация\nУслуга: ' + selected.service + '\nЦена: ' + selected.price;
+  const chat = 'https://t.me/BOPHAMETEAM?text=' + encodeURIComponent(text);
+  /* sendData работает ТОЛЬКО если Mini App открыт кнопкой клавиатуры бота.
+     Для такого запуска открывайте сайт с адресом ...index.html?send=1 */
+  const useSendData = new URLSearchParams(location.search).get('send') === '1';
+  try {
+    if (useSendData) {
+      const u = (tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
+      tg.sendData(JSON.stringify({
+        service: selected.service,
+        price: selected.price,
+        name: [u.first_name, u.last_name].filter(Boolean).join(' '),
+        telegram: u.username ? '@' + u.username : '',
+        message: 'Привет, нужна консультация'
+      }));
+    } else {
+      tg.openTelegramLink(chat); // открывает ваш чат с готовым текстом
+    }
+  } catch (err) {
+    window.location.href = chat;
+  }
 });
 </script>
 </body>
